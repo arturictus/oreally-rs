@@ -15,25 +15,18 @@ pub struct Opts {
 }
 
 pub fn run(opts: Opts) -> Result<(), Box<dyn error::Error>> {
-    // let opts: Opts = Opts::parse();
-
     let url_str = &opts.url;
     let (epub_name, book_id) =
         parse_url(url_str).unwrap_or_else(|_| panic!("invalid Url: {}", url_str));
 
     let auth = get_arg_or_env(opts.auth, "OREALLY_AUTH")
-        .unwrap_or_else(|| panic!("--auth argument or OREALLY_AUTH environment variable required"));
+        .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
     let folder = get_arg_or_env(opts.folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
     let docker_command = format!(
         "(docker run kirinnee/orly:latest login {book_id} {auth}) > \"{folder}/{epub_name}.epub\"",
     );
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(docker_command)
-        .output()
-        .expect("Failed to execute Docker command");
+    Command::new("sh").arg("-c").arg(docker_command).spawn()?;
 
-    println!("{}", String::from_utf8_lossy(&output.stdout));
     Ok(())
 }
 
@@ -50,7 +43,7 @@ fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
     let re = Regex::new(r"learning.oreilly.com/library/view/(?P<name>.+)/(?P<id>\d+).*").unwrap();
     let captures = re
         .captures(url_str.as_bytes())
-        .unwrap_or_else(|| panic!("invalid Url: {}", url_str));
+        .ok_or(format!("invalid Url: {}", url_str))?;
 
     let id: String = std::str::from_utf8(captures.name("id").unwrap().as_bytes())
         .unwrap()
