@@ -6,7 +6,7 @@ use std::{
 
 use rusqlite::{Connection, Result};
 
-use crate::BookRequest;
+
 
 #[derive(Debug)]
 pub struct BookRecord {

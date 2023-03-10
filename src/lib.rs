@@ -82,7 +82,7 @@ impl Commands {
                     break Ok(());
                 }
                 for record in list {
-                    let req = BookRequest::new_from_record(&record, &self)?;
+                    let req = BookRequest::new_from_record(&record, self)?;
                     download::run(req)?;
                     record.delete()?;
                 }
