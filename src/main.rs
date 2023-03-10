@@ -1,7 +1,7 @@
 use clap::Parser;
-use oreally::{run, Opts};
+use oreally::{run, Cli};
 
 fn main() {
-    let opts: Opts = Opts::parse();
+    let opts: Cli = Cli::parse();
     run(opts).unwrap();
 }

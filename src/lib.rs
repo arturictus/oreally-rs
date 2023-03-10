@@ -1,33 +1,87 @@
-use clap::Parser;
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use std::error;
+mod download;
 use regex::bytes::Regex;
 use std::env;
-use std::error;
-use std::process::Command;
 
-#[derive(Parser, Debug)]
-pub struct Opts {
-    #[arg(long)]
-    url: String,
-    #[arg(long)]
-    auth: Option<String>,
-    #[arg(long)]
-    folder: Option<String>,
+#[derive(Debug, Parser)] // requires `derive` feature
+#[command(name = "oreilly")]
+#[command(about = "An O'really book downloader", long_about = None)]
+pub struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-pub fn run(opts: Opts) -> Result<(), Box<dyn error::Error>> {
-    let url_str = &opts.url;
-    let (epub_name, book_id) =
-        parse_url(url_str).unwrap_or_else(|_| panic!("invalid Url: {}", url_str));
+#[derive(Debug, Subcommand, Clone)]
+enum Commands {
+    #[command(about = "Download a book")]
+    Download {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        auth: Option<String>,
+        #[arg(long)]
+        folder: Option<String>,
+    },
+    #[command(about = "Queue a book")]
+    Queue {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        auth: Option<String>,
+        #[arg(long)]
+        folder: Option<String>,
+    },
+}
 
-    let auth = get_arg_or_env(opts.auth, "OREALLY_AUTH")
-        .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
-    let folder = get_arg_or_env(opts.folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
-    let docker_command = format!(
-        "(docker run kirinnee/orly:latest login {book_id} {auth}) > \"{folder}/{epub_name}.epub\"",
-    );
-    Command::new("sh").arg("-c").arg(docker_command).spawn()?;
+pub struct BookRequest {
+    id: String,
+    title: String,
+    auth: String,
+    folder: String,
+}
 
-    Ok(())
+pub fn run(opts: Cli) -> Result<(), Box<dyn error::Error>> {
+    opts.command.run()
+}
+
+impl Commands {
+    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        match self {
+            Commands::Download { .. } => {
+                let req = BookRequest::new(self.clone())?;
+                download::run(req)
+            }
+            _ => {
+                panic!("Invalid command");
+            }
+        }
+    }
+}
+
+impl BookRequest {
+    fn new(cmd: Commands) -> Result<BookRequest, Box<dyn error::Error>> {
+        match cmd {
+            Commands::Download { url, auth, folder } => {
+                let (epub_name, book_id) =
+                    parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
+
+                let auth = get_arg_or_env(auth, "OREALLY_AUTH")
+                    .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
+                let folder =
+                    get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
+                Ok(BookRequest {
+                    id: book_id,
+                    title: epub_name,
+                    auth,
+                    folder,
+                })
+            }
+            _ => {
+                panic!("Invalid command");
+            }
+        }
+    }
 }
 
 fn get_arg_or_env(arg: Option<String>, env_name: &str) -> Option<String> {
@@ -39,6 +93,7 @@ fn get_arg_or_env(arg: Option<String>, env_name: &str) -> Option<String> {
         },
     }
 }
+
 fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
     let re = Regex::new(r"learning.oreilly.com/library/view/(?P<name>.+)/(?P<id>\d+).*").unwrap();
     let captures = re
