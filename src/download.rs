@@ -4,7 +4,6 @@ use std::process::Command;
 
 pub(crate) fn run(opts: BookRequest) -> Result<(), Box<dyn error::Error>> {
     let BookRequest {
-        id,
         book_id,
         title,
         auth,

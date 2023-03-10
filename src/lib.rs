@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
 use std::error;
 mod download;
-mod queue;
 mod storage;
 use regex::bytes::Regex;
 use std::env;
+use storage::{BookRecord, Storage};
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[command(name = "oreilly")]
@@ -34,12 +34,18 @@ enum Commands {
         #[arg(long)]
         folder: Option<String>,
     },
+    #[command(about = "Start processing books queue")]
+    Start {
+        #[arg(long)]
+        auth: Option<String>,
+        #[arg(long)]
+        folder: Option<String>,
+    },
     List,
 }
 
 #[derive(Debug)]
 pub struct BookRequest {
-    id: Option<u32>,
     book_id: String,
     title: String,
     auth: String,
@@ -57,63 +63,101 @@ impl Commands {
                 let req = BookRequest::new(self.clone())?;
                 download::run(req)
             }
-            Self::Queue { .. } => {
-                let req = BookRequest::new(self.clone())?;
-                queue::run(req)
+            Self::Queue { url, .. } => {
+                // Validate url
+                BookRequest::new(self.clone())?;
+                Storage::setup()?;
+                let mut record = BookRecord::new(url.to_string());
+                record.insert()?;
+                Ok(())
             }
             Self::List => {
-                let list = storage::get_pending()?;
+                let list = BookRecord::all()?;
                 println!("{:?}", list);
                 Ok(())
             }
+            Self::Start { .. } => loop {
+                let list = BookRecord::all()?;
+                if list.is_empty() {
+                    break Ok(());
+                }
+                for record in list {
+                    let req = BookRequest::new_from_record(&record, &self)?;
+                    download::run(req)?;
+                    record.delete()?;
+                }
+            },
         }
     }
-}
 
-impl BookRequest {
-    fn new(cmd: Commands) -> Result<BookRequest, Box<dyn error::Error>> {
-        match cmd {
-            Commands::Download { url, auth, folder } => {
-                let (epub_name, book_id) =
-                    parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
-
-                let auth = get_arg_or_env(auth, "OREALLY_AUTH")
+    pub fn auth(&self) -> Result<String, Box<dyn std::error::Error>> {
+        match self {
+            Self::Download { auth, .. } | Self::Queue { auth, .. } | Self::Start { auth, .. } => {
+                let auth = get_arg_or_env(auth.clone(), "OREALLY_AUTH")
                     .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
-                let folder =
-                    get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
-                Ok(BookRequest {
-                    id: None,
-                    book_id: book_id,
-                    title: epub_name,
-                    auth,
-                    folder,
-                })
+                Ok(auth)
             }
-            // TODO: refactor this
-            Commands::Queue { url, auth, folder } => {
-                let (epub_name, book_id) =
-                    parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
-
-                let auth = get_arg_or_env(auth, "OREALLY_AUTH")
-                    .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
-                let folder =
-                    get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
-                Ok(BookRequest {
-                    id: None,
-                    book_id,
-                    title: epub_name,
-                    auth,
-                    folder,
-                })
+            _ => panic!("invalid command"),
+        }
+    }
+    pub fn folder(&self) -> Result<String, Box<dyn std::error::Error>> {
+        match self {
+            Self::Download { folder, .. }
+            | Self::Queue { folder, .. }
+            | Self::Start { folder, .. } => {
+                let folder = get_arg_or_env(folder.clone(), "OREALLY_FOLDER")
+                    .unwrap_or_else(|| "~".to_string());
+                Ok(folder)
             }
             _ => panic!("invalid command"),
         }
     }
 }
 
-fn get_arg_or_env(arg: Option<String>, env_name: &str) -> Option<String> {
+impl BookRequest {
+    fn new_from_record(
+        record: &storage::BookRecord,
+        cmd: &Commands,
+    ) -> Result<Self, Box<dyn error::Error>> {
+        let (epub_name, book_id) = parse_url(&record.url).unwrap();
+
+        Ok(Self {
+            book_id,
+            title: epub_name,
+            auth: cmd.auth()?,
+            folder: cmd.folder()?,
+        })
+    }
+    fn new(cmd: Commands) -> Result<BookRequest, Box<dyn error::Error>> {
+        match cmd {
+            Commands::Download { url, auth, folder } => Self::build(url, auth, folder),
+            Commands::Queue { url, auth, folder } => Self::build(url, auth, folder),
+            _ => panic!("invalid command"),
+        }
+    }
+    fn build(
+        url: String,
+        auth: Option<String>,
+        folder: Option<String>,
+    ) -> Result<BookRequest, Box<dyn error::Error>> {
+        let (epub_name, book_id) =
+            parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
+
+        let auth = get_arg_or_env(auth, "OREALLY_AUTH")
+            .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
+        let folder = get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
+        Ok(BookRequest {
+            book_id,
+            title: epub_name,
+            auth,
+            folder,
+        })
+    }
+}
+
+fn get_arg_or_env(arg: Option<impl Into<String>>, env_name: &str) -> Option<String> {
     match arg {
-        Some(arg) => Some(arg),
+        Some(arg) => Some(arg.into()),
         None => match env::var(env_name) {
             Ok(env) => Some(env),
             Err(_) => None,
