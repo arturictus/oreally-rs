@@ -3,5 +3,11 @@ use oreally::{run, Cli};
 
 fn main() {
     let cli: Cli = Cli::parse();
-    run(cli).map_err(|e| println!("{:?}", e)).unwrap();
+    match run(cli) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+    }
 }

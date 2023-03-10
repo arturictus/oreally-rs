@@ -29,6 +29,9 @@ impl Storage {
 
     pub fn setup() -> Result<(), Box<dyn std::error::Error>> {
         let db_path = Storage::db_path();
+        if Path::new(&db_path).exists() {
+            return Ok(());
+        }
         let folder = Path::new(&db_path).parent().unwrap();
         fs::create_dir_all(folder).unwrap_or_else(|_| {
             panic!("unable to create folder {folder:?} for database file");
@@ -56,11 +59,11 @@ impl BookRecord {
             return Ok(self);
         }
         let conn = Storage::conn()?;
-        let id = conn.execute(
-            "INSERT INTO book_queue (url) VALUES (?1) RETURNING id",
-            [&self.url],
-        )?;
-        self.id = Some(id.try_into()?);
+        println!("Inserting book {:?}", self);
+        conn.execute("INSERT INTO book_queue (url) VALUES (?1)", [&self.url])?;
+
+        self.id = Some(conn.last_insert_rowid().try_into()?);
+        println!("Inserted book with id {:#?}", self);
         Ok(self)
     }
     pub fn all() -> Result<Vec<BookRecord>, Box<dyn std::error::Error>> {

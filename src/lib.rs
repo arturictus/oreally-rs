@@ -3,7 +3,7 @@ use std::error;
 mod download;
 mod storage;
 use regex::bytes::Regex;
-use std::env;
+use std::{env, thread, time};
 use storage::{BookRecord, Storage};
 
 #[derive(Debug, Parser)] // requires `derive` feature
@@ -64,7 +64,9 @@ impl Commands {
                 parse_url(url)?;
                 Storage::setup()?;
                 let mut record = BookRecord::new(url.to_string());
+                println!("Pending books before {:?}", BookRecord::all()?);
                 record.insert()?;
+                println!("Pending books after {:?}", BookRecord::all()?);
                 Ok(())
             }
             Self::List => {
@@ -74,14 +76,16 @@ impl Commands {
             }
             Self::Start { .. } => loop {
                 let list = BookRecord::all()?;
-                if list.is_empty() {
-                    break Ok(());
-                }
+                println!("Pending books {:?}", list);
+                // if list.is_empty() {
+                //     break Ok(());
+                // }
                 for record in list {
                     let req = BookRequest::new_from_record(&record, self)?;
                     download::run(req)?;
                     record.delete()?;
                 }
+                wait();
             },
         }
     }
@@ -148,6 +152,10 @@ impl BookRequest {
     }
 }
 
+fn wait() {
+    let ten_millis = time::Duration::from_millis(1000);
+    thread::sleep(ten_millis);
+}
 fn get_arg_or_env<T: Into<String>>(arg: Option<T>, env_name: &str) -> Option<String> {
     match arg {
         Some(arg) => Some(arg.into()),
