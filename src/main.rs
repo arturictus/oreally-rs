@@ -2,6 +2,6 @@ use clap::Parser;
 use oreally::{run, Cli};
 
 fn main() {
-    let opts: Cli = Cli::parse();
-    run(opts).unwrap();
+    let cli: Cli = Cli::parse();
+    run(cli).map_err(|e| println!("{:?}", e)).unwrap();
 }

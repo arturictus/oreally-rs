@@ -1,12 +1,10 @@
+use dirs;
 use std::{
-    env,
     fs::{self, File},
     path::Path,
 };
 
 use rusqlite::{Connection, Result};
-
-
 
 #[derive(Debug)]
 pub struct BookRecord {
@@ -14,12 +12,11 @@ pub struct BookRecord {
     pub url: String,
 }
 
-pub struct Storage {}
+pub struct Storage;
 
 impl Storage {
     pub fn db_path() -> String {
-        // TODO: Use a better way to get home directory
-        let home = env::home_dir().unwrap();
+        let home = dirs::home_dir().unwrap();
         let db_path = home.join(".oreally/oreilly.db");
         db_path.to_str().unwrap().to_string()
     }
@@ -92,68 +89,3 @@ impl BookRecord {
         Ok(())
     }
 }
-
-// pub fn add_book(BookRecord { id: _, url }: BookRecord) -> Result<(), Box<dyn std::error::Error>> {
-//     let conn = Connection::open("~/.oreally/oreilly.db")?;
-//     conn.execute("INSERT INTO book_queue (url) VALUES (?1)", [url])?;
-//     Ok(())
-// }
-
-// pub fn get_pending() -> Result<Vec<BookRecord>, Box<dyn std::error::Error>> {
-//     let conn = Connection::open("~/.oreally/oreilly.db")?;
-//     let mut stmt = conn.prepare("SELECT id, url FROM book_queue")?;
-//     let book_iter = stmt.query_map([], |row| {
-//         Ok(BookRecord {
-//             id: row.get(0)?,
-//             url: row.get(1)?,
-//         })
-//     })?;
-
-//     let mut books = Vec::new();
-//     for book in book_iter {
-//         books.push(book.unwrap());
-//     }
-//     Ok(books)
-// }
-
-// pub fn remove_book(id: i32) -> Result<(), Box<dyn std::error::Error>> {
-//     let conn = Connection::open("~/.oreally/oreilly.db")?;
-//     conn.execute("DELETE FROM book WHERE id = ?1", [id])?;
-//     Ok(())
-// }
-
-// fn main() -> Result<()> {
-//     let conn = Connection::open_in_memory()?;
-
-//     conn.execute(
-//         "CREATE TABLE person (
-//             id    INTEGER PRIMARY KEY,
-//             name  TEXT NOT NULL,
-//             data  BLOB
-//         )",
-//         (), // empty list of parameters.
-//     )?;
-//     let me = Person {
-//         id: 0,
-//         name: "Steven".to_string(),
-//         data: None,
-//     };
-//     conn.execute(
-//         "INSERT INTO person (name, data) VALUES (?1, ?2)",
-//         (&me.name, &me.data),
-//     )?;
-
-//     let mut stmt = conn.prepare("SELECT id, name, data FROM person")?;
-//     let person_iter = stmt.query_map([], |row| {
-//         Ok(Person {
-//             id: row.get(0)?,
-//             name: row.get(1)?,
-//             data: row.get(2)?,
-//         })
-//     })?;
-
-//     for person in person_iter {
-//         println!("Found person {:?}", person.unwrap());
-//     }
-//     Ok(())
-// }

@@ -29,10 +29,6 @@ enum Commands {
     Queue {
         #[arg(long)]
         url: String,
-        #[arg(long)]
-        auth: Option<String>,
-        #[arg(long)]
-        folder: Option<String>,
     },
     #[command(about = "Start processing books queue")]
     Start {
@@ -52,8 +48,8 @@ pub struct BookRequest {
     folder: String,
 }
 
-pub fn run(opts: Cli) -> Result<(), Box<dyn error::Error>> {
-    opts.command.run()
+pub fn run(cli: Cli) -> Result<(), Box<dyn error::Error>> {
+    cli.command.run()
 }
 
 impl Commands {
@@ -65,7 +61,7 @@ impl Commands {
             }
             Self::Queue { url, .. } => {
                 // Validate url
-                BookRequest::new(self.clone())?;
+                parse_url(url)?;
                 Storage::setup()?;
                 let mut record = BookRecord::new(url.to_string());
                 record.insert()?;
@@ -92,7 +88,7 @@ impl Commands {
 
     pub fn auth(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
-            Self::Download { auth, .. } | Self::Queue { auth, .. } | Self::Start { auth, .. } => {
+            Self::Download { auth, .. } | Self::Start { auth, .. } => {
                 let auth = get_arg_or_env(auth.clone(), "OREALLY_AUTH")
                     .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
                 Ok(auth)
@@ -102,9 +98,7 @@ impl Commands {
     }
     pub fn folder(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
-            Self::Download { folder, .. }
-            | Self::Queue { folder, .. }
-            | Self::Start { folder, .. } => {
+            Self::Download { folder, .. } | Self::Start { folder, .. } => {
                 let folder = get_arg_or_env(folder.clone(), "OREALLY_FOLDER")
                     .unwrap_or_else(|| "~".to_string());
                 Ok(folder)
@@ -131,7 +125,6 @@ impl BookRequest {
     fn new(cmd: Commands) -> Result<BookRequest, Box<dyn error::Error>> {
         match cmd {
             Commands::Download { url, auth, folder } => Self::build(url, auth, folder),
-            Commands::Queue { url, auth, folder } => Self::build(url, auth, folder),
             _ => panic!("invalid command"),
         }
     }
@@ -155,7 +148,7 @@ impl BookRequest {
     }
 }
 
-fn get_arg_or_env(arg: Option<impl Into<String>>, env_name: &str) -> Option<String> {
+fn get_arg_or_env<T: Into<String>>(arg: Option<T>, env_name: &str) -> Option<String> {
     match arg {
         Some(arg) => Some(arg.into()),
         None => match env::var(env_name) {
@@ -199,7 +192,7 @@ mod test {
 
     #[test]
     fn test_get_arg_or_env_panics() {
-        get_arg_or_env(None, "ENV");
+        get_arg_or_env(None::<String>, "ENV");
     }
     #[test]
     fn test_get_arg_or_env() {
@@ -208,7 +201,10 @@ mod test {
             Some("Hello".to_string())
         );
         std::env::set_var("ENV", "env_value");
-        assert_eq!(get_arg_or_env(None, "ENV"), Some("env_value".to_string()));
+        assert_eq!(
+            get_arg_or_env(None::<String>, "ENV"),
+            Some("env_value".to_string())
+        );
         assert_eq!(
             get_arg_or_env(Some("Hello".to_string()), "ENV"),
             Some("Hello".to_string())
