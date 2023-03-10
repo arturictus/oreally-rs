@@ -1,6 +1,6 @@
 use crate::BookRequest;
 use std::error;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 pub(crate) fn run(opts: BookRequest) -> Result<(), Box<dyn error::Error>> {
     let BookRequest {
@@ -12,7 +12,13 @@ pub(crate) fn run(opts: BookRequest) -> Result<(), Box<dyn error::Error>> {
     let docker_command = format!(
         "(docker run kirinnee/orly:latest login {book_id} {auth}) > \"{folder}/{title}.epub\"",
     );
-    Command::new("sh").arg("-c").arg(docker_command).spawn()?;
+    let child = Command::new("sh")
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .arg("-c")
+        .arg(docker_command)
+        .spawn()?;
+    child.wait_with_output()?;
 
     Ok(())
 }
