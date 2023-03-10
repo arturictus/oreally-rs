@@ -1,6 +1,8 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use std::error;
 mod download;
+mod queue;
+mod storage;
 use regex::bytes::Regex;
 use std::env;
 
@@ -32,8 +34,10 @@ enum Commands {
         #[arg(long)]
         folder: Option<String>,
     },
+    List,
 }
 
+#[derive(Debug)]
 pub struct BookRequest {
     id: String,
     title: String,
@@ -48,12 +52,18 @@ pub fn run(opts: Cli) -> Result<(), Box<dyn error::Error>> {
 impl Commands {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         match self {
-            Commands::Download { .. } => {
+            Self::Download { .. } => {
                 let req = BookRequest::new(self.clone())?;
                 download::run(req)
             }
-            _ => {
-                panic!("Invalid command");
+            Self::Queue { .. } => {
+                let req = BookRequest::new(self.clone())?;
+                queue::run(req)
+            }
+            Self::List => {
+                let list = storage::get_pending()?;
+                println!("{:?}", list);
+                Ok(())
             }
         }
     }
@@ -77,9 +87,23 @@ impl BookRequest {
                     folder,
                 })
             }
-            _ => {
-                panic!("Invalid command");
+            // TODO: refactor this
+            Commands::Queue { url, auth, folder } => {
+                let (epub_name, book_id) =
+                    parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
+
+                let auth = get_arg_or_env(auth, "OREALLY_AUTH")
+                    .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
+                let folder =
+                    get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
+                Ok(BookRequest {
+                    id: book_id,
+                    title: epub_name,
+                    auth,
+                    folder,
+                })
             }
+            _ => panic!("invalid command"),
         }
     }
 }
