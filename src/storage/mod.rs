@@ -19,9 +19,10 @@ pub fn setup() -> Result<(), Box<dyn std::error::Error>> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS book (
             id    INTEGER PRIMARY KEY,
+            book_id  TEXT NOT NULL,
             title  TEXT NOT NULL,
-            auth  TEXT,
-            folder  TEXT
+            auth  TEXT NOT NULL,
+            folder  TEXT NOT NULL
         )",
         [],
     )?;
@@ -31,24 +32,26 @@ pub fn setup() -> Result<(), Box<dyn std::error::Error>> {
 pub fn add_book(opts: BookRequest) -> Result<(), Box<dyn std::error::Error>> {
     let BookRequest {
         id,
+        book_id,
         title,
         auth,
         folder,
     } = opts;
     let conn = Connection::open("~/.oreally/oreilly.db")?;
     conn.execute(
-        "INSERT INTO book (id, title, auth, folder) VALUES (?1, ?2, ?3, ?4)",
-        [id, title, auth, folder],
+        "INSERT INTO book (book_id, title, auth, folder) VALUES (?1, ?2, ?3, ?4)",
+        [book_id, title, auth, folder],
     )?;
     Ok(())
 }
 
 pub fn get_pending() -> Result<Vec<BookRequest>, Box<dyn std::error::Error>> {
     let conn = Connection::open("~/.oreally/oreilly.db")?;
-    let mut stmt = conn.prepare("SELECT id, title, auth, folder FROM book")?;
+    let mut stmt = conn.prepare("SELECT id, book_id, title, auth, folder FROM book")?;
     let book_iter = stmt.query_map([], |row| {
         Ok(BookRequest {
             id: row.get(0)?,
+            book_id: row.get(0)?,
             title: row.get(1)?,
             auth: row.get(2)?,
             folder: row.get(3)?,

@@ -39,7 +39,8 @@ enum Commands {
 
 #[derive(Debug)]
 pub struct BookRequest {
-    id: String,
+    id: Option<u32>,
+    book_id: String,
     title: String,
     auth: String,
     folder: String,
@@ -81,7 +82,8 @@ impl BookRequest {
                 let folder =
                     get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
                 Ok(BookRequest {
-                    id: book_id,
+                    id: None,
+                    book_id: book_id,
                     title: epub_name,
                     auth,
                     folder,
@@ -97,7 +99,8 @@ impl BookRequest {
                 let folder =
                     get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
                 Ok(BookRequest {
-                    id: book_id,
+                    id: None,
+                    book_id,
                     title: epub_name,
                     auth,
                     folder,
