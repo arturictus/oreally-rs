@@ -60,44 +60,45 @@ pub struct BookRequest {
 }
 
 pub fn run(cli: Cli) -> Result<(), Box<dyn error::Error>> {
-    cli.command.run()
+    let storage = &Storage::default();
+    cli.command.run(storage)
 }
 
 impl Commands {
-    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(&self, storage: &Storage) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Self::Download { .. } => {
                 let req = BookRequest::try_from(self.clone())?;
                 download::run(req)
             }
             Self::Queue { url, .. } => {
-                assert_readiness()?;
+                assert_readiness(storage)?;
                 // Validate url
                 parse_url(url)?;
                 let mut record = BookRecord::new(url.to_string());
-                record.insert()?;
+                record.insert(storage)?;
                 Ok(())
             }
             Self::List => {
-                assert_readiness()?;
-                let list = BookRecord::all()?;
+                assert_readiness(storage)?;
+                let list = BookRecord::all(storage)?;
                 println!("{:?}", list);
                 Ok(())
             }
             Self::Init { .. } => {
-                assert_unreadiness()?;
-                Storage::setup()?;
+                assert_unreadiness(storage)?;
+                storage.setup()?;
                 Ok(())
             }
             Self::Start { .. } => {
-                assert_readiness()?;
+                assert_readiness(storage)?;
                 loop {
-                    let list = BookRecord::all()?;
+                    let list = BookRecord::all(storage)?;
                     println!("Pending books {:?}", list);
                     for record in list {
                         let req = BookRequest::new_from_record(&record, self)?;
                         download::run(req)?;
-                        record.delete()?;
+                        record.delete(storage)?;
                     }
                     wait();
                 }
@@ -167,15 +168,15 @@ impl TryFrom<Commands> for BookRequest {
     }
 }
 
-fn assert_readiness() -> Result<(), Box<dyn error::Error>> {
-    if !Storage::is_ready() {
+fn assert_readiness(storage: &Storage) -> Result<(), Box<dyn error::Error>> {
+    if !storage.is_ready() {
         println!("Please run `oreilly init` to setup configuration");
         return Err("Not ready".into());
     }
     Ok(())
 }
-fn assert_unreadiness() -> Result<(), Box<dyn error::Error>> {
-    if Storage::is_ready() {
+fn assert_unreadiness(storage: &Storage) -> Result<(), Box<dyn error::Error>> {
+    if storage.is_ready() {
         println!("Oreilly is already initialized run `oreilly start` to start processing");
         return Err("Allready Initialized".into());
     }

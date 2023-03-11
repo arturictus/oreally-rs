@@ -11,26 +11,42 @@ pub struct BookRecord {
     pub url: String,
 }
 
-pub struct Storage;
+#[derive(Debug, Default)]
+pub struct Storage {
+    db_path: Option<String>,
+}
 
 impl Storage {
-    pub fn db_path() -> String {
+    pub fn new(path: Option<String>) -> Self {
+        Self { db_path: path }
+    }
+    pub fn db_path(&self) -> String {
+        if let Some(path) = &self.db_path {
+            return path.clone();
+        }
+        Self::default_db_path().into()
+    }
+
+    pub fn default_db_path() -> String {
         let home = dirs::home_dir().unwrap();
         let db_path = home.join(".oreally/oreilly.db");
         db_path.to_str().unwrap().to_string()
     }
 
-    pub fn conn() -> Result<Connection> {
-        let db_path = Storage::db_path();
+    pub fn conn(&self) -> Result<Connection, Box<dyn std::error::Error>> {
+        if !self.is_ready() {
+            return Err("Database is not ready".into());
+        }
+        let db_path = self.db_path();
         let conn = Connection::open(db_path)?;
         Ok(conn)
     }
-    pub fn is_ready() -> bool {
-        let db_path = Storage::db_path();
+    pub fn is_ready(&self) -> bool {
+        let db_path = self.db_path();
         Path::new(&db_path).exists()
     }
-    pub fn setup() -> Result<(), Box<dyn std::error::Error>> {
-        let db_path = Storage::db_path();
+    pub fn setup(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = self.db_path();
         if Path::new(&db_path).exists() {
             println!("Database file already exists at {db_path:?}");
             return Ok(());
@@ -41,7 +57,7 @@ impl Storage {
         });
         File::create(&db_path)
             .unwrap_or_else(|_| panic!("unable to create database file at {db_path:?}"));
-        let conn = Self::conn()?;
+        let conn = self.conn()?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS book_queue (
                 id    INTEGER PRIMARY KEY,
@@ -57,11 +73,11 @@ impl BookRecord {
     pub fn new(url: String) -> Self {
         Self { id: None, url }
     }
-    pub fn insert(&mut self) -> Result<&mut Self, Box<dyn std::error::Error>> {
+    pub fn insert(&mut self, storage: &Storage) -> Result<&mut Self, Box<dyn std::error::Error>> {
         if self.id.is_some() {
             return Ok(self);
         }
-        let conn = Storage::conn()?;
+        let conn = storage.conn()?;
         println!("Inserting book {:?}", self);
         conn.execute("INSERT INTO book_queue (url) VALUES (?1)", [&self.url])?;
 
@@ -69,8 +85,8 @@ impl BookRecord {
         println!("Inserted book with id {:#?}", self);
         Ok(self)
     }
-    pub fn all() -> Result<Vec<BookRecord>, Box<dyn std::error::Error>> {
-        let conn = Storage::conn()?;
+    pub fn all(storage: &Storage) -> Result<Vec<BookRecord>, Box<dyn std::error::Error>> {
+        let conn = storage.conn()?;
         let mut stmt = conn.prepare("SELECT id, url FROM book_queue")?;
         let book_iter = stmt.query_map([], |row| {
             Ok(BookRecord {
@@ -86,11 +102,11 @@ impl BookRecord {
         Ok(books)
     }
 
-    pub fn delete(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn delete(&self, storage: &Storage) -> Result<(), Box<dyn std::error::Error>> {
         if self.id.is_none() {
             return Ok(());
         }
-        let conn = Storage::conn()?;
+        let conn = storage.conn()?;
         conn.execute("DELETE FROM book_queue WHERE id = ?1", [self.id])?;
         Ok(())
     }
