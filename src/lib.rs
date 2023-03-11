@@ -67,13 +67,11 @@ impl Commands {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Self::Download { .. } => {
-                let req = BookRequest::new(self.clone())?;
+                let req = BookRequest::try_from(self.clone())?;
                 download::run(req)
             }
             Self::Queue { url, .. } => {
-                if !Self::is_ready() {
-                    return Ok(());
-                }
+                assert_readiness()?;
                 // Validate url
                 parse_url(url)?;
                 let mut record = BookRecord::new(url.to_string());
@@ -81,42 +79,30 @@ impl Commands {
                 Ok(())
             }
             Self::List => {
-                if !Self::is_ready() {
-                    return Ok(());
-                }
+                assert_readiness()?;
                 let list = BookRecord::all()?;
                 println!("{:?}", list);
                 Ok(())
             }
             Self::Init { .. } => {
-                if Self::is_ready() {
-                    println!("Configuration already exists");
-                    return Ok(());
-                }
+                assert_unreadiness()?;
                 Storage::setup()?;
                 Ok(())
             }
-            Self::Start { .. } => loop {
-                if !Self::is_ready() {
-                    break Ok(());
+            Self::Start { .. } => {
+                assert_readiness()?;
+                loop {
+                    let list = BookRecord::all()?;
+                    println!("Pending books {:?}", list);
+                    for record in list {
+                        let req = BookRequest::new_from_record(&record, self)?;
+                        download::run(req)?;
+                        record.delete()?;
+                    }
+                    wait();
                 }
-                let list = BookRecord::all()?;
-                println!("Pending books {:?}", list);
-                for record in list {
-                    let req = BookRequest::new_from_record(&record, self)?;
-                    download::run(req)?;
-                    record.delete()?;
-                }
-                wait();
-            },
+            }
         }
-    }
-    pub fn is_ready() -> bool {
-        let ready = Storage::is_ready();
-        if !ready {
-            println!("Please run `oreilly init` to setup configuration");
-        }
-        ready
     }
     pub fn auth(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
@@ -154,32 +140,47 @@ impl BookRequest {
             folder: cmd.folder()?,
         })
     }
-    fn new(cmd: Commands) -> Result<BookRequest, Box<dyn error::Error>> {
-        match cmd {
-            Commands::Download { url, auth, folder } => Self::build(url, auth, folder),
+}
+
+impl TryFrom<Commands> for BookRequest {
+    type Error = Box<dyn error::Error>;
+
+    fn try_from(value: Commands) -> Result<Self, Self::Error> {
+        match value {
+            Commands::Download { url, auth, folder } => {
+                let (epub_name, book_id) =
+                    parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
+
+                let auth = get_arg_or_env(auth, "OREALLY_AUTH")
+                    .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
+                let folder =
+                    get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
+                Ok(BookRequest {
+                    book_id,
+                    title: epub_name,
+                    auth,
+                    folder,
+                })
+            }
             _ => panic!("invalid command"),
         }
     }
-    fn build(
-        url: String,
-        auth: Option<String>,
-        folder: Option<String>,
-    ) -> Result<BookRequest, Box<dyn error::Error>> {
-        let (epub_name, book_id) =
-            parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
-
-        let auth = get_arg_or_env(auth, "OREALLY_AUTH")
-            .ok_or("--auth argument or OREALLY_AUTH environment variable required")?;
-        let folder = get_arg_or_env(folder, "OREALLY_FOLDER").unwrap_or_else(|| "~".to_string());
-        Ok(BookRequest {
-            book_id,
-            title: epub_name,
-            auth,
-            folder,
-        })
-    }
 }
 
+fn assert_readiness() -> Result<(), Box<dyn error::Error>> {
+    if !Storage::is_ready() {
+        println!("Please run `oreilly init` to setup configuration");
+        return Err("Not ready".into());
+    }
+    Ok(())
+}
+fn assert_unreadiness() -> Result<(), Box<dyn error::Error>> {
+    if Storage::is_ready() {
+        println!("Oreilly is already initialized run `oreilly start` to start processing");
+        return Err("Allready Initialized".into());
+    }
+    Ok(())
+}
 fn wait() {
     let ten_millis = time::Duration::from_millis(1000);
     thread::sleep(ten_millis);
