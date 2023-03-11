@@ -233,15 +233,31 @@ mod test {
 
     #[test]
     fn book_request_new_from_record() {
-        todo!()
+        let r = BookRequest::new_from_record(
+            &BookRecord::new(
+                "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288",
+            ),
+            &Commands::Start {
+                auth: Some("auth".to_string()),
+                folder: Some("folder".to_string()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(r.book_id, "9781838985288");
+        assert_eq!(r.title, "learn-postgresql");
     }
     #[test]
-    fn book_request_new() {
-        todo!()
-    }
-    #[test]
-    fn book_request_build() {
-        todo!()
+    fn command_into_book_request() {
+        let cmd = Commands::Download {
+            url: "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288"
+                .to_string(),
+            auth: Some("auth".to_string()),
+            folder: Some("folder".to_string()),
+        };
+        let r = BookRequest::try_from(cmd).unwrap();
+        assert_eq!(r.book_id, "9781838985288");
+        assert_eq!(r.title, "learn-postgresql");
     }
 
     #[test]
