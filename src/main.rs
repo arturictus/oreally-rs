@@ -1,7 +1,13 @@
 use clap::Parser;
-use oreally::{run, Opts};
+use oreally::{run, Cli};
 
 fn main() {
-    let opts: Opts = Opts::parse();
-    run(opts).unwrap();
+    let cli: Cli = Cli::parse();
+    match run(cli) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+    }
 }
