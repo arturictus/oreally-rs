@@ -215,20 +215,43 @@ fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
 mod test {
     use super::*;
     #[test]
-    fn commands_run() {
-        todo!()
-    }
-    #[test]
-    fn commands_is_ready() {
-        todo!()
+    fn commands_run_download() {
+        // TODO: mock storage
     }
     #[test]
     fn commands_auth() {
-        todo!()
+        assert_eq!(
+            Commands::Start {
+                auth: Some("auth".to_string()),
+                folder: Some("folder".to_string()),
+            }
+            .auth()
+            .unwrap(),
+            "auth"
+        );
+        assert_eq!(
+            Commands::Download {
+                url: "tets".to_string(),
+                auth: Some("auth".to_string()),
+                folder: Some("folder".to_string()),
+            }
+            .auth()
+            .unwrap(),
+            "auth".to_string()
+        );
     }
     #[test]
     fn commands_folder() {
-        todo!()
+        assert_eq!(
+            Commands::Download {
+                url: "tets".to_string(),
+                auth: Some("auth".to_string()),
+                folder: Some("folder".to_string()),
+            }
+            .folder()
+            .unwrap(),
+            "folder".to_string()
+        );
     }
 
     #[test]
