@@ -1,4 +1,3 @@
-use dirs;
 use std::{
     fs::{self, File},
     path::Path,
