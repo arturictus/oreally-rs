@@ -68,20 +68,20 @@ impl Commands {
     pub fn run(&self, storage: &Storage) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Self::Download { .. } => {
-                let req = BookRequest::try_from(self.clone())?;
+                let req = self.clone().try_into()?;
                 download::run(req)
             }
             Self::Queue { url, .. } => {
                 assert_readiness(storage)?;
                 // Validate url
                 parse_url(url)?;
-                let mut record = BookRecord::new(url.to_string());
+                let mut record = BookRecord::new(url);
                 record.insert(storage)?;
                 Ok(())
             }
             Self::List => {
                 assert_readiness(storage)?;
-                let list = BookRecord::all(storage)?;
+                let list = BookRecord::all(storage);
                 println!("{:?}", list);
                 Ok(())
             }
@@ -93,7 +93,7 @@ impl Commands {
             Self::Start { .. } => {
                 assert_readiness(storage)?;
                 loop {
-                    let list = BookRecord::all(storage)?;
+                    let list = BookRecord::all(storage);
                     println!("Pending books {:?}", list);
                     for record in list {
                         let req = BookRequest::new_from_record(&record, self)?;
