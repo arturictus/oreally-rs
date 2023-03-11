@@ -26,10 +26,14 @@ impl Storage {
         let conn = Connection::open(db_path)?;
         Ok(conn)
     }
-
+    pub fn is_ready() -> bool {
+        let db_path = Storage::db_path();
+        Path::new(&db_path).exists()
+    }
     pub fn setup() -> Result<(), Box<dyn std::error::Error>> {
         let db_path = Storage::db_path();
         if Path::new(&db_path).exists() {
+            println!("Database file already exists at {db_path:?}");
             return Ok(());
         }
         let folder = Path::new(&db_path).parent().unwrap();

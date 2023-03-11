@@ -37,6 +37,17 @@ enum Commands {
         #[arg(long)]
         folder: Option<String>,
     },
+    #[command(about = "Initalises configuration")]
+    Init {
+        #[arg(long, short)]
+        config_folder: Option<String>,
+        #[arg(long, short)]
+        books_folder: Option<String>,
+        #[arg(long, short)]
+        username: Option<String>,
+        #[arg(long, short)]
+        password: Option<String>,
+    },
     List,
 }
 
@@ -60,26 +71,37 @@ impl Commands {
                 download::run(req)
             }
             Self::Queue { url, .. } => {
+                if !Self::is_ready() {
+                    return Ok(());
+                }
                 // Validate url
                 parse_url(url)?;
-                Storage::setup()?;
                 let mut record = BookRecord::new(url.to_string());
-                println!("Pending books before {:?}", BookRecord::all()?);
                 record.insert()?;
-                println!("Pending books after {:?}", BookRecord::all()?);
                 Ok(())
             }
             Self::List => {
+                if !Self::is_ready() {
+                    return Ok(());
+                }
                 let list = BookRecord::all()?;
                 println!("{:?}", list);
                 Ok(())
             }
+            Self::Init { .. } => {
+                if Self::is_ready() {
+                    println!("Configuration already exists");
+                    return Ok(());
+                }
+                Storage::setup()?;
+                Ok(())
+            }
             Self::Start { .. } => loop {
+                if !Self::is_ready() {
+                    break Ok(());
+                }
                 let list = BookRecord::all()?;
                 println!("Pending books {:?}", list);
-                // if list.is_empty() {
-                //     break Ok(());
-                // }
                 for record in list {
                     let req = BookRequest::new_from_record(&record, self)?;
                     download::run(req)?;
@@ -89,7 +111,13 @@ impl Commands {
             },
         }
     }
-
+    pub fn is_ready() -> bool {
+        let ready = Storage::is_ready();
+        if !ready {
+            println!("Please run `oreilly init` to setup configuration");
+        }
+        ready
+    }
     pub fn auth(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
             Self::Download { auth, .. } | Self::Start { auth, .. } => {
