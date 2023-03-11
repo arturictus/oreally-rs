@@ -212,6 +212,35 @@ fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn commands_run() {
+        todo!()
+    }
+    #[test]
+    fn commands_is_ready() {
+        todo!()
+    }
+    #[test]
+    fn commands_auth() {
+        todo!()
+    }
+    #[test]
+    fn commands_folder() {
+        todo!()
+    }
+
+    #[test]
+    fn book_request_new_from_record() {
+        todo!()
+    }
+    #[test]
+    fn book_request_new() {
+        todo!()
+    }
+    #[test]
+    fn book_request_build() {
+        todo!()
+    }
 
     #[test]
     fn test_parse_url() {
@@ -227,7 +256,7 @@ mod test {
     }
 
     #[test]
-    fn test_get_arg_or_env_panics() {
+    fn get_arg_or_env_panics() {
         get_arg_or_env(None::<String>, "ENV");
     }
     #[test]

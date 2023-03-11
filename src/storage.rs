@@ -95,3 +95,41 @@ impl BookRecord {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn book_record_new() {
+        todo!()
+    }
+    #[test]
+    fn book_record_insert() {
+        todo!()
+    }
+    #[test]
+    fn book_record_all() {
+        todo!()
+    }
+    #[test]
+    fn book_record_delete() {
+        todo!()
+    }
+    #[test]
+    fn storage_db_path() {
+        todo!()
+    }
+    #[test]
+    fn storage_conn() {
+        todo!()
+    }
+    #[test]
+    fn storage_is_ready() {
+        todo!()
+    }
+    #[test]
+    fn storage_setup() {
+        todo!()
+    }
+}
