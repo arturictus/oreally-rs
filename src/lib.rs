@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::error;
 mod download;
+mod init;
 mod storage;
 use regex::bytes::Regex;
 use std::{env, thread, time};
@@ -15,7 +16,7 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand, Clone)]
-enum Commands {
+pub enum Commands {
     #[command(about = "Download a book")]
     Download {
         #[arg(long)]
