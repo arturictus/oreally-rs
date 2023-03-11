@@ -1,0 +1,17 @@
+version = "0.3.2"
+env_files = [".env"]
+
+[scripts]
+run = { cmd = "cargo run -- download --url 'https://learning.oreilly.com/library/view/learn-postgresql/9781838985288' --auth %OREALLY_AUTH --folder %OREALLY_FOLDER", env_vars = [
+  "OREALLY_AUTH",
+  "OREALLY_FOLDER",
+] }
+queue = "cargo run -- queue --url 'https://learning.oreilly.com/library/view/learn-postgresql/9781838985288'"
+start = { cmd = "cargo run -- start --auth %OREALLY_AUTH --folder ~/Books", env_vars = [
+  "OREALLY_AUTH",
+] }
+test = "cargo test %% -- --nocapture"
+clippy = "cargo clippy -- -D warnings"
+fix = "cargo clippy --fix"
+list = "cargo run -- list"
+check = { cmd = "cargo check && cargo fmt -- --check && cargo clippy && cargo test", desc = "validates the code (same checks as on CI)" }
