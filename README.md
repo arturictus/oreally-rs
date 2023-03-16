@@ -120,7 +120,7 @@ oreally start
 
 ### init
 
-Initialize configuration for oreally. This command sets up the default download location and other settings.
+Initialize configuration for oreally. This command sets up the `sqlite` database at `~/.oreally` folder.
 
 Example:
 
@@ -130,7 +130,7 @@ oreally init
 
 ### list
 
-List all queued and downloaded books. This command provides a list of all the books that are currently queued or have been downloaded.
+List all queued and downloaded books. This command provides a list of all the books that are currently queued.
 
 Example:
 
