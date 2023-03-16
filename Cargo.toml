@@ -11,6 +11,7 @@ regex = "1.7.1"
 url = "2.3.1"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 dirs = "4.0.0"
+prettytable = "0.10.0"
 
 
 [dev-dependencies]
