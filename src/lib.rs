@@ -42,6 +42,8 @@ enum Commands {
     List,
 }
 
+pub type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
 #[derive(Debug)]
 pub struct BookRequest {
     book_id: String,
@@ -50,13 +52,13 @@ pub struct BookRequest {
     folder: String,
 }
 
-pub fn run(cli: Cli) -> Result<(), Box<dyn error::Error>> {
+pub fn run(cli: Cli) -> Result<()> {
     let storage = &Storage::default();
     cli.command.run(storage)
 }
 
 impl Commands {
-    pub fn run(&self, storage: &Storage) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(&self, storage: &Storage) -> Result<()> {
         match self {
             Self::Download { .. } => {
                 let req = self.clone().try_into()?;
@@ -73,7 +75,7 @@ impl Commands {
             Self::List => {
                 assert_readiness(storage)?;
                 let list = BookRecord::all(storage);
-                println!("{:?}", list);
+                BookRecord::table(&list)?.printstd();
                 Ok(())
             }
             Self::Init { .. } => {
@@ -85,7 +87,7 @@ impl Commands {
                 assert_readiness(storage)?;
                 loop {
                     let list = BookRecord::all(storage);
-                    println!("Pending books {:?}", list);
+                    BookRecord::table(&list)?.printstd();
                     for record in list {
                         let req = BookRequest::new_from_record(&record, self)?;
                         download::run(req)?;
@@ -96,7 +98,7 @@ impl Commands {
             }
         }
     }
-    pub fn auth(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn auth(&self) -> Result<String> {
         match self {
             Self::Download { auth, .. } | Self::Start { auth, .. } => {
                 let auth = get_arg_or_env(auth.clone(), "OREALLY_AUTH")
@@ -106,7 +108,7 @@ impl Commands {
             _ => panic!("invalid command"),
         }
     }
-    pub fn folder(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn folder(&self) -> Result<String> {
         match self {
             Self::Download { folder, .. } | Self::Start { folder, .. } => {
                 let folder = get_arg_or_env(folder.clone(), "OREALLY_FOLDER")
@@ -119,10 +121,7 @@ impl Commands {
 }
 
 impl BookRequest {
-    fn new_from_record(
-        record: &storage::BookRecord,
-        cmd: &Commands,
-    ) -> Result<Self, Box<dyn error::Error>> {
+    fn new_from_record(record: &storage::BookRecord, cmd: &Commands) -> Result<Self> {
         let (epub_name, book_id) = parse_url(&record.url).unwrap();
 
         Ok(Self {
@@ -137,7 +136,7 @@ impl BookRequest {
 impl TryFrom<Commands> for BookRequest {
     type Error = Box<dyn error::Error>;
 
-    fn try_from(value: Commands) -> Result<Self, Self::Error> {
+    fn try_from(value: Commands) -> Result<Self> {
         match value {
             Commands::Download { url, auth, folder } => {
                 let (epub_name, book_id) =
@@ -159,14 +158,14 @@ impl TryFrom<Commands> for BookRequest {
     }
 }
 
-fn assert_readiness(storage: &Storage) -> Result<(), Box<dyn error::Error>> {
+fn assert_readiness(storage: &Storage) -> Result<()> {
     if !storage.is_ready() {
         println!("Please run `oreilly init` to setup configuration");
         return Err("Not ready".into());
     }
     Ok(())
 }
-fn assert_unreadiness(storage: &Storage) -> Result<(), Box<dyn error::Error>> {
+fn assert_unreadiness(storage: &Storage) -> Result<()> {
     if storage.is_ready() {
         println!("Oreilly is already initialized run `oreilly start` to start processing");
         return Err("Allready Initialized".into());
@@ -187,7 +186,7 @@ fn get_arg_or_env<T: Into<String>>(arg: Option<T>, env_name: &str) -> Option<Str
     }
 }
 
-fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
+fn parse_url(url_str: &str) -> Result<(String, String)> {
     let re = Regex::new(r"learning.oreilly.com/library/view/(?P<name>.+)/(?P<id>\d+).*").unwrap();
     let captures = re
         .captures(url_str.as_bytes())

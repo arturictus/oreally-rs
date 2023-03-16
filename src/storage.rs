@@ -3,7 +3,10 @@ use std::{
     path::Path,
 };
 
+use prettytable::row;
 use rusqlite::{Connection, Result};
+
+use crate::parse_url;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BookRecord {
@@ -122,6 +125,17 @@ impl BookRecord {
             books.push(book.unwrap());
         }
         books
+    }
+
+    pub fn table(books: &Vec<Self>) -> Result<prettytable::Table> {
+        let mut table = prettytable::Table::new();
+        table.add_row(row!["ID", "Book ID", "Title", "URL"]);
+        for book in books {
+            let (tittle, oreilly_id) =
+                parse_url(&book.url).unwrap_or_else(|_| ("".to_string(), "".to_string()));
+            table.add_row(row![book.id.unwrap(), oreilly_id, tittle, book.url]);
+        }
+        Ok(table)
     }
 
     pub fn delete(&self, storage: &Storage) -> Result<(), Box<dyn std::error::Error>> {
