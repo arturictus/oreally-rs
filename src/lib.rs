@@ -193,12 +193,20 @@ fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
         .captures(url_str.as_bytes())
         .ok_or(format!("invalid Url: {}", url_str))?;
 
-    let id: String = std::str::from_utf8(captures.name("id").unwrap().as_bytes())
-        .unwrap()
-        .to_owned();
-    let name: String = std::str::from_utf8(captures.name("name").unwrap().as_bytes())
-        .unwrap()
-        .to_owned();
+    let id: String = std::str::from_utf8(
+        captures
+            .name("id")
+            .ok_or("invalid url missing id")?
+            .as_bytes(),
+    )?
+    .to_owned();
+    let name: String = std::str::from_utf8(
+        captures
+            .name("name")
+            .ok_or("invalid url missing name")?
+            .as_bytes(),
+    )?
+    .to_owned();
     Ok((name, id))
 }
 

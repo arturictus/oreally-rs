@@ -6,7 +6,7 @@ run = { cmd = "cargo run -- download --url 'https://learning.oreilly.com/library
   "OREALLY_AUTH",
   "OREALLY_FOLDER",
 ] }
-queue = "cargo run -- queue --url 'https://learning.oreilly.com/library/view/learn-postgresql/9781838985288'"
+queue = "cargo run -- queue --url %%"
 start = { cmd = "cargo run -- start --auth %OREALLY_AUTH --folder ~/Books", env_vars = [
   "OREALLY_AUTH",
 ] }
