@@ -135,11 +135,11 @@ impl BookRecord {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use uuid::Uuid;
 
-    fn around(f: impl Fn(&Storage)) {
+    pub fn around(f: impl Fn(&Storage)) {
         fs::create_dir_all("tmp").unwrap();
         let storage = Storage::new(Some(format!("tmp/{}.db", Uuid::new_v4()).to_string()));
         storage.flush().unwrap();

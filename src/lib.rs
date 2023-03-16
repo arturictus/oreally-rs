@@ -6,7 +6,7 @@ use regex::bytes::Regex;
 use std::{env, thread, time};
 use storage::{BookRecord, Storage};
 
-#[derive(Debug, Parser)] // requires `derive` feature
+#[derive(Debug, Parser)]
 #[command(name = "oreilly")]
 #[command(about = "An O'really book downloader", long_about = None)]
 pub struct Cli {
@@ -38,16 +38,7 @@ enum Commands {
         folder: Option<String>,
     },
     #[command(about = "Initalises configuration")]
-    Init {
-        #[arg(long, short)]
-        config_folder: Option<String>,
-        #[arg(long, short)]
-        books_folder: Option<String>,
-        #[arg(long, short)]
-        username: Option<String>,
-        #[arg(long, short)]
-        password: Option<String>,
-    },
+    Init,
     List,
 }
 
@@ -202,22 +193,47 @@ fn parse_url(url_str: &str) -> Result<(String, String), Box<dyn error::Error>> {
         .captures(url_str.as_bytes())
         .ok_or(format!("invalid Url: {}", url_str))?;
 
-    let id: String = std::str::from_utf8(captures.name("id").unwrap().as_bytes())
-        .unwrap()
-        .to_owned();
-    let name: String = std::str::from_utf8(captures.name("name").unwrap().as_bytes())
-        .unwrap()
-        .to_owned();
+    let id: String = std::str::from_utf8(
+        captures
+            .name("id")
+            .ok_or("invalid url missing id")?
+            .as_bytes(),
+    )?
+    .to_owned();
+    let name: String = std::str::from_utf8(
+        captures
+            .name("name")
+            .ok_or("invalid url missing name")?
+            .as_bytes(),
+    )?
+    .to_owned();
     Ok((name, id))
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    static URL: &str = "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288";
+
     #[test]
-    fn commands_run_download() {
-        // TODO: mock storage
+    fn commands_run_queue() {
+        storage::test::around(|storage| {
+            let url = URL.to_string();
+            Commands::Queue { url: url.clone() }.run(storage).unwrap();
+            let list = BookRecord::all(storage);
+            assert_eq!(list.len(), 1);
+            assert_eq!(list[0].url, url);
+        })
     }
+    #[test]
+    fn commands_run_init() {
+        let storage = Storage::new(Some("tmp/fdjkfd.db".to_string()));
+        Commands::Init.run(&storage).unwrap();
+        assert_readiness(&storage).unwrap();
+        storage.drop().unwrap();
+    }
+
     #[test]
     fn commands_auth() {
         assert_eq!(
@@ -257,9 +273,7 @@ mod test {
     #[test]
     fn book_request_new_from_record() {
         let r = BookRequest::new_from_record(
-            &BookRecord::new(
-                "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288",
-            ),
+            &BookRecord::new(URL),
             &Commands::Start {
                 auth: Some("auth".to_string()),
                 folder: Some("folder".to_string()),
@@ -273,8 +287,7 @@ mod test {
     #[test]
     fn command_into_book_request() {
         let cmd = Commands::Download {
-            url: "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288"
-                .to_string(),
+            url: URL.to_string(),
             auth: Some("auth".to_string()),
             folder: Some("folder".to_string()),
         };
@@ -285,13 +298,12 @@ mod test {
 
     #[test]
     fn test_parse_url() {
-        let url_str = "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288";
+        let url_str = URL;
         let (title, id) = parse_url(url_str).unwrap();
         assert_eq!(title, "learn-postgresql");
         assert_eq!(id, "9781838985288");
-        let url_str =
-            "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288/fdfd";
-        let (title, id) = parse_url(url_str).unwrap();
+        let url_str = format!("{URL}/fdfd");
+        let (title, id) = parse_url(&url_str).unwrap();
         assert_eq!(title, "learn-postgresql");
         assert_eq!(id, "9781838985288");
     }
