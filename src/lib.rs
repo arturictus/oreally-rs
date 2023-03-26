@@ -1,13 +1,15 @@
 use clap::{Parser, Subcommand};
 use std::error;
 mod download;
+mod pueue;
 mod storage;
+
 use regex::bytes::Regex;
 use std::{env, thread, time};
 use storage::{BookRecord, Storage};
 
 #[derive(Debug, Parser)]
-#[command(name = "oreilly")]
+#[command(name = "oreally")]
 #[command(about = "An O'really book downloader", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
@@ -15,7 +17,7 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand, Clone)]
-enum Commands {
+pub enum Commands {
     #[command(about = "Download a book")]
     Download {
         #[arg(long)]
@@ -29,6 +31,15 @@ enum Commands {
     Queue {
         #[arg(long)]
         url: String,
+    },
+    #[command(about = "Queue a book using `pueue`")]
+    Pueue {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        auth: Option<String>,
+        #[arg(long)]
+        folder: Option<String>,
     },
     #[command(about = "Start processing books queue")]
     Start {
@@ -52,13 +63,13 @@ pub struct BookRequest {
     folder: String,
 }
 
-pub fn run(cli: Cli) -> Result<()> {
+pub async fn run(cli: Cli) -> Result<()> {
     let storage = &Storage::default();
-    cli.command.run(storage)
+    cli.command.run(storage).await
 }
 
 impl Commands {
-    pub fn run(&self, storage: &Storage) -> Result<()> {
+    pub async fn run(&self, storage: &Storage) -> Result<()> {
         match self {
             Self::Download { .. } => {
                 let req = self.clone().try_into()?;
@@ -70,6 +81,12 @@ impl Commands {
                 parse_url(url)?;
                 let mut record = BookRecord::new(url);
                 record.insert(storage)?;
+                Ok(())
+            }
+            Self::Pueue { .. } => {
+                // Validate url
+                let req: BookRequest = self.clone().try_into()?;
+                pueue::run(&req).await?;
                 Ok(())
             }
             Self::List => {
@@ -131,6 +148,18 @@ impl BookRequest {
             folder: cmd.folder()?,
         })
     }
+
+    pub fn to_cmd(&self) -> String {
+        let BookRequest {
+            book_id,
+            title,
+            auth,
+            folder,
+        } = self;
+        format!(
+            "(docker run kirinnee/orly:latest login {book_id} {auth}) > \"{folder}/{title}.epub\"",
+        )
+    }
 }
 
 impl TryFrom<Commands> for BookRequest {
@@ -138,7 +167,7 @@ impl TryFrom<Commands> for BookRequest {
 
     fn try_from(value: Commands) -> Result<Self> {
         match value {
-            Commands::Download { url, auth, folder } => {
+            Commands::Download { url, auth, folder } | Commands::Pueue { url, auth, folder } => {
                 let (epub_name, book_id) =
                     parse_url(&url).unwrap_or_else(|_| panic!("invalid Url: {}", url));
 
@@ -190,19 +219,19 @@ fn parse_url(url_str: &str) -> Result<(String, String)> {
     let re = Regex::new(r"learning.oreilly.com/library/view/(?P<name>.+)/(?P<id>\d+).*").unwrap();
     let captures = re
         .captures(url_str.as_bytes())
-        .ok_or(format!("invalid Url: {}", url_str))?;
+        .ok_or(format!("Invalid Url: {}", url_str))?;
 
     let id: String = std::str::from_utf8(
         captures
             .name("id")
-            .ok_or("invalid url missing id")?
+            .ok_or("Invalid url: missing id")?
             .as_bytes(),
     )?
     .to_owned();
     let name: String = std::str::from_utf8(
         captures
             .name("name")
-            .ok_or("invalid url missing name")?
+            .ok_or("Invalid url: missing name")?
             .as_bytes(),
     )?
     .to_owned();
@@ -215,20 +244,26 @@ mod test {
 
     static URL: &str = "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288";
 
-    #[test]
-    fn commands_run_queue() {
-        storage::test::around(|storage| {
-            let url = URL.to_string();
-            Commands::Queue { url: url.clone() }.run(storage).unwrap();
-            let list = BookRecord::all(storage);
-            assert_eq!(list.len(), 1);
-            assert_eq!(list[0].url, url);
+    #[tokio::test]
+    async fn commands_run_queue() {
+        storage::test::around(async {
+            |storage| {
+                let url = URL.to_string();
+                Commands::Queue { url: url.clone() }
+                    .run(storage)
+                    .await
+                    .unwrap();
+                let list = BookRecord::all(storage);
+                assert_eq!(list.len(), 1);
+                assert_eq!(list[0].url, url);
+            }
         })
+        .await
     }
-    #[test]
-    fn commands_run_init() {
+    #[tokio::test]
+    async fn commands_run_init() {
         let storage = Storage::new(Some("tmp/fdjkfd.db".to_string()));
-        Commands::Init.run(&storage).unwrap();
+        Commands::Init.run(&storage).await.unwrap();
         assert_readiness(&storage).unwrap();
         storage.drop().unwrap();
     }
