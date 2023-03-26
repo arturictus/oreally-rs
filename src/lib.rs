@@ -244,20 +244,26 @@ mod test {
 
     static URL: &str = "https://learning.oreilly.com/library/view/learn-postgresql/9781838985288";
 
-    #[test]
-    fn commands_run_queue() {
-        storage::test::around(|storage| {
-            let url = URL.to_string();
-            Commands::Queue { url: url.clone() }.run(storage).unwrap();
-            let list = BookRecord::all(storage);
-            assert_eq!(list.len(), 1);
-            assert_eq!(list[0].url, url);
+    #[tokio::test]
+    async fn commands_run_queue() {
+        storage::test::around(async {
+            |storage| {
+                let url = URL.to_string();
+                Commands::Queue { url: url.clone() }
+                    .run(storage)
+                    .await
+                    .unwrap();
+                let list = BookRecord::all(storage);
+                assert_eq!(list.len(), 1);
+                assert_eq!(list[0].url, url);
+            }
         })
+        .await
     }
-    #[test]
-    fn commands_run_init() {
+    #[tokio::test]
+    async fn commands_run_init() {
         let storage = Storage::new(Some("tmp/fdjkfd.db".to_string()));
-        Commands::Init.run(&storage).unwrap();
+        Commands::Init.run(&storage).await.unwrap();
         assert_readiness(&storage).unwrap();
         storage.drop().unwrap();
     }

@@ -153,7 +153,7 @@ pub(crate) mod test {
     use super::*;
     use uuid::Uuid;
 
-    pub fn around(f: impl Fn(&Storage)) {
+    pub async fn around(f: impl Fn(&Storage)) {
         fs::create_dir_all("tmp").unwrap();
         let storage = Storage::new(Some(format!("tmp/{}.db", Uuid::new_v4()).to_string()));
         storage.flush().unwrap();
@@ -166,17 +166,18 @@ pub(crate) mod test {
         let url = "https://www.oreilly.com/library/view/".to_string();
         assert_eq!(BookRecord::new(&url), BookRecord { id: None, url });
     }
-    #[test]
-    fn book_record_insert() {
+    #[tokio::test]
+    async fn book_record_insert() {
         around(|storage| {
             let url = "https://www.oreilly.com/library/view/".to_string();
             let mut r = BookRecord::new(&url);
             r.insert(&storage).unwrap();
             assert_eq!(r, BookRecord { id: Some(1), url });
         })
+        .await
     }
-    #[test]
-    fn book_record_all() {
+    #[tokio::test]
+    async fn book_record_all() {
         around(|storage| {
             // let r = factory_book_record(storage, FactoryAction::Insert);
             let url = "https://www.oreilly.com/library/view/".to_string();
@@ -185,9 +186,10 @@ pub(crate) mod test {
             let books = BookRecord::all(&storage);
             assert_eq!(books, vec![r]);
         })
+        .await
     }
-    #[test]
-    fn book_record_delete() {
+    #[tokio::test]
+    async fn book_record_delete() {
         around(|storage| {
             let url = "https://www.oreilly.com/library/view/".to_string();
             let mut r = BookRecord::new(&url);
@@ -198,6 +200,7 @@ pub(crate) mod test {
             let books = BookRecord::all(storage);
             assert_eq!(books, vec![]);
         })
+        .await
     }
     #[test]
     fn storage_db_path() {
@@ -214,12 +217,13 @@ pub(crate) mod test {
                 .to_string()
         );
     }
-    #[test]
-    fn storage_conn() {
+    #[tokio::test]
+    async fn storage_conn() {
         around(|storage| {
             let conn = storage.conn().unwrap();
             assert_eq!(conn.query_row("SELECT 1", [], |row| row.get(0)), Ok(1));
         })
+        .await
     }
     #[test]
     fn storage_is_ready() {
